@@ -29,33 +29,24 @@ def read_images_labels(images_filepath, labels_filepath):
 x_train, y_train = read_images_labels("./data/train-images-idx3-ubyte/train-images-idx3-ubyte", "./data/train-labels-idx1-ubyte/train-labels-idx1-ubyte")
 x_test, y_test = read_images_labels("./data/t10k-images-idx3-ubyte/t10k-images-idx3-ubyte", "./data/t10k-labels-idx1-ubyte/t10k-labels-idx1-ubyte")
 
-x_train = np.array(x_train)
-x_test = np.array(x_test)
-y_train = np.array(y_train)
-y_test = np.array(y_test)
+x_train = np.stack(x_train)
+y_train = np.stack(y_train)
+x_test = np.stack(x_test)
+y_test = np.stack(y_test)   
 
 x_train = x_train.reshape(x_train.shape[0], 784).T
+y_train = y_train.T
 x_test = x_test.reshape(x_test.shape[0], 784).T
 
-#Rectified Linear Unit (ReLu) activation function
+x_train = x_train / 255
+
 def ReLu(Z):
     return np.maximum(Z, 0)
 
-def softmax(Z): 
-
-  
-    Z_stable = Z - np.max(Z, axis=0, keepdims=True)  # Numerical stability trick
-    expZ = np.exp(Z_stable)
-    probabilities = expZ / np.sum(expZ, axis=0, keepdims=True)
-    return probabilities
-
-
+def softmax(Z):
+    A = np.exp(Z) / sum(np.exp(Z))
+    return A
     
-    # expSum = np.sum(np.exp(Z), axis=0)
-    # probabilities = np.exp(Z) / expSum
-
-    # return probabilities
-
 #forward prop
 def forwardProp(W1, W2, b1, b2, X): #weights and biases for both first layer and output layer and the input layer (X) 
 
@@ -66,8 +57,10 @@ def forwardProp(W1, W2, b1, b2, X): #weights and biases for both first layer and
     #SECOND layer (output)
     Z2= W2.dot(A1) + b2
     A2 = softmax(Z2)
-    
+
     return A1, Z1, A2, Z2 #returning results to later update the biases
+
+
 
 def backwards(A1, A2, Z1, W2, X, Y):
 
@@ -77,16 +70,18 @@ def backwards(A1, A2, Z1, W2, X, Y):
 
     #second (output) layer
     a_m = np.shape(A1)[0]
-    dW2 =  (1/a_m)*(A2 - Y_onehot).dot(A1.T)   
-    db2 = (1/a_m) * np.sum(A2 - Y_onehot)
+    dZ2 = (A2 - Y_onehot)
+    dW2 =  (1/a_m)*dZ2.dot(A1.T)   
+    db2 = (1/a_m) * np.sum(dZ2)
 
     #first layer
     x_m = np.shape(X)[0]
     dReLu = (Z1 > 0).astype(float)
 
-    dW1 = (1/x_m) * (((W2.T).dot(A2 - Y_onehot) * dReLu).dot(X.T))
-    # dW1 = (1/x_m)*( ((W2.T).dot(A2 - Y_onehot)).dot(X.T) * (dReLu)) 
-    db1 = (1/x_m) * (np.sum((W2.T).dot(A2 - Y_onehot) * dReLu))
+
+    dZ1 = (W2.T).dot(dZ2) * dReLu 
+    dW1 = (1/x_m) * (dZ1.dot(X.T))
+    db1 = (1/x_m) * (np.sum(dZ1))
 
     return dW1, dW2, db1, db2
 
@@ -98,32 +93,24 @@ def  optimize(W1, W2, b1, b2, dW1, dW2, db1, db2, lr):
 
     return W1, W2, b1, b2
 
-def train():
+def train(learning_rate, epochs):
 
     W1 = np.random.rand(10, 784) - 0.5#hiden layers has 10 neurons (10 rows) each of which need a weight corresponding to each input neuron
     b1 = np.random.rand(10, 1) - 0.5 #random bias specific to each neuron in the hidden layer 
-
     W2 = np.random.rand(10,10) - 0.5
     b2 = np.random.rand(10,1) - 0.5
-# 
-    learning_rate = 1e-3
-    epochs = 5
-    for i in range(epochs):
+    for i in range(500):
         A1, Z1, A2, Z2 = forwardProp(W1, W2, b1, b2, x_train)
-
-        #calculate gradients (backwards prop)
-        dW1, dW2, db1, db2 = backwards(A1, A2, Z1, W2, x_train, y_train)
-
-        #update params
+        dW1, dW2, db1, db2 = backwards(A1, A2, Z1, W2,x_train, y_train)
         W1, W2, b1, b2 = optimize(W1, W2, b1, b2, dW1, dW2, db1, db2, learning_rate)
-
+        
         print("Iteration: ", i)
         predictions = np.argmax(A2, 0)
-        print(predictions)
-        print(np.sum(predictions == y_train) / y_train.size)
-        print("-----")
-        
+        print(predictions, y_train)
+        print(str(np.sum(predictions == y_train) * 100  / y_train.size)  + "%")
 
-train()
 
+learning_rate = 1e-3
+epochs = 500
+train(learning_rate, epochs)
 #to save just save the weights and biases and use forward prop and A2 is the answer
